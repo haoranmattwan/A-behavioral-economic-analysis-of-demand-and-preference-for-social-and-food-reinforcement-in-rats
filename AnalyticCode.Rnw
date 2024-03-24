@@ -1,0 +1,270 @@
+\documentclass[fleqn,12pt]{article}
+\setlength\parindent{0pt}
+\usepackage{fullpage}
+\usepackage{dcolumn}
+\usepackage{fixltx2e}
+\usepackage{amsmath}
+\usepackage{scrextend}
+\usepackage[sc]{mathpazo}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\geometry{verbose,tmargin=2.5cm,bmargin=2.5cm,lmargin=2.5cm,rmargin=2.5cm}
+\setcounter{secnumdepth}{5}
+\setcounter{tocdepth}{5}
+\usepackage{url}
+\usepackage[unicode=true,pdfusetitle,
+            bookmarks=true,bookmarksnumbered=true,bookmarksopen=true,bookmarksopenlevel=2,
+            breaklinks=false,pdfborder={0 0 1},backref=false,colorlinks=false]
+{hyperref}
+\hypersetup{
+  pdfstartview={XYZ null null 1}}
+\usepackage{breakurl}
+\usepackage{amsfonts}
+\usepackage[dvips]{epsfig}
+\usepackage{algorithm2e}
+\usepackage{verbatim}
+\usepackage{mathtools}
+\usepackage{scrextend}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{IEEEtrantools}
+\graphicspath{ {images/} }
+\newcolumntype{L}[1]{>{\raggedright\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{C}[1]{>{\centering\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\usepackage{setspace}
+\setstretch{1.15}
+
+\begin{document}
+\title{Own- and Cross-Price Demand Curve Analyses for Food and Social Reinforcer}
+\author{\vspace{-5ex}}
+\date{\vspace{-5ex}}
+\maketitle
+
+\section{Preliminaries}
+
+In this section, the RStudio workspace and console panes are cleared of old output, variables, and other miscellaneous debris.  Be sure that nothing to be removed is needed.  Once the decks are cleared, get required packages and data files.  
+
+\subsection{Options}
+<<tidy=TRUE,message=FALSE,warning=FALSE>>=
+# Set some global options
+options(replace.assign=TRUE, width=65, digits=4,scipen=4, fig.width=4, fig.height=4)
+# Clear the workspace and console
+rm(list = ls(all.names = TRUE)) 
+cat("\014")
+# Start timing
+how_long <- Sys.time()
+@
+
+\subsection{Packages}
+<<message=FALSE,warning=FALSE>>=
+library(here)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(ggpubr)
+library(minpack.lm)
+@
+
+\subsection{Get the Data & Functions}
+<<tidy=TRUE,message=FALSE,warning=FALSE>>=
+# Function
+lhs <- function(x) {
+  # log-like scale
+  log10(0.5*x + sqrt(0.25*(x^2) + 1)) }
+antilog <- function(y) {
+  # Antilog 
+  (10^(2*y)-1)/(10^y) }
+ev <- function(y) {
+  # Expected Value
+  1 / (100 * y)}
+# Data
+Behav <- read.csv("data/data with bl mean.csv") |>
+  mutate(foodr_lhs = lhs(foodr),socr_lhs = lhs(socr))
+@
+
+\clearpage
+
+\section{Own-price Demand Curve Fitting}
+
+\textbf{\large{\textit{
+The following analyses were conducted to fit the demand data with the Zero-Bounded Exponential model (Gilroy et al., 2021).  It should be noted that the values of the parameters may not be exactly the same as the ones reported on the published article because of the different software & algorithms were used. 
+}}}
+
+\subsection{Condition 1:  Food own price demand}
+<<tidy=TRUE,message=FALSE,warning=FALSE>>=
+group_by(subset(Behav, cond == 1), subj) |>
+  mutate(alpha = coef(nlsLM(foodr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * foodfr)),
+                            start = list(a = .0001, Q_0 = 50), 
+                            control = nls.lm.control(maxiter = 1024)))[1],
+         alpha_se = summary(nlsLM(foodr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * foodfr)),
+                                  start = list(a = .0001, Q_0 = 50), 
+                                  control = nls.lm.control(maxiter = 1024)))$coef["a","Std. Error"],
+         Q0   = coef(nlsLM(foodr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * foodfr)),
+                            start = list(a = .0001, Q_0 = 50), 
+                            control = nls.lm.control(maxiter = 1024)))[2],
+         Q0_se   = summary(nlsLM(foodr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * foodfr)),
+                            start = list(a = .0001, Q_0 = 50), 
+                            control = nls.lm.control(maxiter = 1024)))$coef["Q_0","Std. Error"]) |>
+  slice(n()) |> select(subj,cond,alpha,alpha_se,Q0,Q0_se) 
+@
+
+\subsection{Condition 2:  Social own price demand}
+<<tidy=TRUE,message=FALSE,warning=FALSE>>=
+group_by(subset(Behav, cond == 2), subj) |>
+  mutate(alpha = coef(nlsLM(socr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * socfr)),
+                            start = list(a = .0001, Q_0 = 50), 
+                            control = nls.lm.control(maxiter = 1024)))[1],
+         alpha_se = summary(nlsLM(socr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * socfr)),
+                                  start = list(a = .0001, Q_0 = 50), 
+                                  control = nls.lm.control(maxiter = 1024)))$coef["a","Std. Error"],
+         Q0   = coef(nlsLM(socr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * socfr)),
+                            start = list(a = .0001, Q_0 = 50), 
+                            control = nls.lm.control(maxiter = 1024)))[2],
+         Q0_se   = summary(nlsLM(socr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * socfr)),
+                            start = list(a = .0001, Q_0 = 50), 
+                            control = nls.lm.control(maxiter = 1024)))$coef["Q_0","Std. Error"]) |>
+  slice(n()) |> select(subj,cond,alpha,alpha_se,Q0,Q0_se) 
+@
+
+\subsection{Condition 3}
+<<tidy=TRUE,message=FALSE,warning=FALSE>>=
+# Food own price demand
+group_by(subset(Behav, cond == 3), subj) |>
+  mutate(alpha = coef(nlsLM(foodr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * foodfr)),
+                            start = list(a = .0001, Q_0 = 50), 
+                            control = nls.lm.control(maxiter = 1024)))[1],
+         alpha_se = summary(nlsLM(foodr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * foodfr)),
+                                  start = list(a = .0001, Q_0 = 50), 
+                                  control = nls.lm.control(maxiter = 1024)))$coef["a","Std. Error"],
+         Q0   = coef(nlsLM(foodr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * foodfr)),
+                            start = list(a = .0001, Q_0 = 50), 
+                            control = nls.lm.control(maxiter = 1024)))[2],
+         Q0_se   = summary(nlsLM(foodr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * foodfr)),
+                            start = list(a = .0001, Q_0 = 50), 
+                            control = nls.lm.control(maxiter = 1024)))$coef["Q_0","Std. Error"]) |>
+  slice(n()) |> select(subj,cond,alpha,alpha_se,Q0,Q0_se) 
+# Social own price demand
+group_by(subset(Behav, cond == 3), subj) |>
+  mutate(alpha = coef(nlsLM(socr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * socfr)),
+                            start = list(a = .0001, Q_0 = 50), 
+                            control = nls.lm.control(maxiter = 1024)))[1],
+         alpha_se = summary(nlsLM(socr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * socfr)),
+                                  start = list(a = .0001, Q_0 = 50), 
+                                  control = nls.lm.control(maxiter = 1024)))$coef["a","Std. Error"],
+         Q0   = coef(nlsLM(socr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * socfr)),
+                            start = list(a = .0001, Q_0 = 50), 
+                            control = nls.lm.control(maxiter = 1024)))[2],
+         Q0_se   = summary(nlsLM(socr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * socfr)),
+                            start = list(a = .0001, Q_0 = 50), 
+                            control = nls.lm.control(maxiter = 1024)))$coef["Q_0","Std. Error"]) |>
+  slice(n()) |> select(subj,cond,alpha,alpha_se,Q0,Q0_se)
+@
+
+\subsection{Condition 4:  Food own price demand}
+<<tidy=TRUE,message=FALSE,warning=FALSE>>=
+group_by(subset(Behav, cond == 4), subj) |>
+  mutate(alpha = coef(nlsLM(foodr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * foodfr)),
+                            start = list(a = .0001, Q_0 = 50), 
+                            control = nls.lm.control(maxiter = 1024)))[1],
+         alpha_se = summary(nlsLM(foodr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * foodfr)),
+                                  start = list(a = .0001, Q_0 = 50), 
+                                  control = nls.lm.control(maxiter = 1024)))$coef["a","Std. Error"],
+         Q0   = coef(nlsLM(foodr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * foodfr)),
+                            start = list(a = .0001, Q_0 = 50), 
+                            control = nls.lm.control(maxiter = 1024)))[2],
+         Q0_se   = summary(nlsLM(foodr_lhs ~ lhs(Q_0) * (exp((-(a) / lhs(Q_0)) * (Q_0) * foodfr)),
+                            start = list(a = .0001, Q_0 = 50), 
+                            control = nls.lm.control(maxiter = 1024)))$coef["Q_0","Std. Error"]) |>
+  slice(n()) |> select(subj,cond,alpha,alpha_se,Q0,Q0_se) 
+@
+
+\section{Cross-price Demand Curve Fitting}
+
+\textbf{\large{\textit{
+The following analyses were conducted to fit the demand data with the simple linear regression model and the exponential cross-price elasticity model (Hursh, 2014).  It should be noted that the values of the parameters may not be exactly the same as the ones reported on the published article because of the different software & algorithms were used. 
+}}}
+
+\subsection{Condition 1:  Social cross price demand}
+<<tidy=TRUE,message=FALSE,warning=FALSE>>=
+# Simple linear model
+group_by(subset(Behav, cond == 1), subj) |>
+  mutate(Intercept = coef(lm(socr ~ 1 + foodfr))[1],
+         Intercept_se = summary(lm(socr ~ 1 + foodfr))$coef["(Intercept)","Std. Error"],
+         FoodPrice = coef(lm(socr ~ 1 + foodfr))[1],
+         FoodPrice_se = summary(lm(socr ~ 1 + foodfr))$coef["foodfr","Std. Error"]) |>
+  slice(n()) |> select(subj,cond,Intercept,Intercept_se,FoodPrice,FoodPrice_se) 
+
+# Exponential cross-price elasticity model
+group_by(subset(Behav, cond == 1), subj) |>
+  mutate(beta = coef(nlsLM(socr ~ log10(Q_a) + I * (exp(-b * foodfr)),
+                           start = list(b = .01, Q_a = 100, I = 1), 
+                           control = nls.lm.control(maxiter = 1024)))[1],
+         beta_se = summary(nlsLM(socr ~ log10(Q_a) + I * (exp(-b * foodfr)),
+                                 start = list(b = .01, Q_a = 100, I = 1), 
+                                 control = nls.lm.control(maxiter = 1024)))$coef["b","Std. Error"],
+         Qalone = coef(nlsLM(socr ~ log10(Q_a) + I * (exp(-b * foodfr)),
+                             start = list(b = .01, Q_a = 100, I = 1), 
+                             control = nls.lm.control(maxiter = 1024)))[2],
+         Qalone_se = summary(nlsLM(socr ~ log10(Q_a) + I * (exp(-b * foodfr)),
+                                   start = list(b = .01, Q_a = 100, I = 1), 
+                                   control = nls.lm.control(maxiter = 1024)))$coef["Q_a","Std. Error"],
+         I = coef(nlsLM(socr ~ log10(Q_a) + I * (exp(-b * foodfr)),
+                        start = list(b = .01, Q_a = 100, I = 1), 
+                        control = nls.lm.control(maxiter = 1024)))[3],
+         I_se = summary(nlsLM(socr ~ log10(Q_a) + I * (exp(-b * foodfr)),
+                              start = list(b = .01, Q_a = 100, I = 1), 
+                              control = nls.lm.control(maxiter = 1024)))$coef["I","Std. Error"]) |>
+  slice(n()) |> select(subj,cond,beta,beta_se,Qalone,Qalone_se,I,I_se) 
+@
+
+\subsection{Condition 2:  Food cross price demand}
+<<tidy=TRUE,message=FALSE,warning=FALSE>>=
+# Simple linear model
+group_by(subset(Behav, cond == 2), subj) |>
+  mutate(Intercept = coef(lm(foodr ~ 1 + socfr))[1],
+         Intercept_se = summary(lm(foodr ~ 1 + socfr))$coef["(Intercept)","Std. Error"],
+         FoodPrice = coef(lm(foodr ~ 1 + socfr))[1],
+         FoodPrice_se = summary(lm(foodr ~ 1 + socfr))$coef["socfr","Std. Error"]) |>
+  slice(n()) |> select(subj,cond,Intercept,Intercept_se,FoodPrice,FoodPrice_se) 
+
+# Exponential cross-price elasticity model
+group_by(subset(Behav, cond == 2), subj) |>
+  mutate(beta = coef(nlsLM(foodr ~ log10(Q_a) + I * (exp(-b * socfr)),
+                           start = list(b = .01, Q_a = 100, I = 1), 
+                           control = nls.lm.control(maxiter = 1024)))[1],
+         beta_se = summary(nlsLM(foodr ~ log10(Q_a) + I * (exp(-b * socfr)),
+                                 start = list(b = .01, Q_a = 100, I = 1), 
+                                 control = nls.lm.control(maxiter = 1024)))$coef["b","Std. Error"],
+         Qalone = coef(nlsLM(foodr ~ log10(Q_a) + I * (exp(-b * socfr)),
+                             start = list(b = .01, Q_a = 100, I = 1), 
+                             control = nls.lm.control(maxiter = 1024)))[2],
+         Qalone_se = summary(nlsLM(foodr ~ log10(Q_a) + I * (exp(-b * socfr)),
+                                   start = list(b = .01, Q_a = 100, I = 1), 
+                                   control = nls.lm.control(maxiter = 1024)))$coef["Q_a","Std. Error"],
+         I = coef(nlsLM(foodr ~ log10(Q_a) + I * (exp(-b * socfr)),
+                        start = list(b = .01, Q_a = 100, I = 1), 
+                        control = nls.lm.control(maxiter = 1024)))[3],
+         I_se = summary(nlsLM(foodr ~ log10(Q_a) + I * (exp(-b * socfr)),
+                              start = list(b = .01, Q_a = 100, I = 1), 
+                              control = nls.lm.control(maxiter = 1024)))$coef["I","Std. Error"]) |>
+  slice(n()) |> select(subj,cond,beta,beta_se,Qalone,Qalone_se,I,I_se) 
+@
+
+\clearpage
+
+<<tidy=TRUE>>=
+# Get system details.
+S <- benchmarkme::get_sys_details()
+GB <- memuse::Sys.meminfo()
+@
+
+The current machine uses the following CPU: \Sexpr{S$cpu$model_name}, with \Sexpr{S$cpu$no_of_cores} cores and \Sexpr{GB$totalram} of RAM. 
+
+<<tidy=TRUE>>=
+sessionInfo()
+Sys.time()-how_long 
+@
+\end{document}
